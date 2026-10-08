@@ -1,0 +1,6 @@
+{
+  "name": "Conversa ✦ Chat Rol IA",
+  "description": "Historias que siempre están contigo. PWA de roleplay y chat con personajes de IA, memoria persistente, estética dark-cinematic y ambiente sonoro.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
