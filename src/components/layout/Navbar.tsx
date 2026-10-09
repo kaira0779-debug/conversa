@@ -1,7 +1,7 @@
 import React from 'react';
 import { MessageSquare, Users, Sparkles, Settings2 } from 'lucide-react';
 
-export type NavTab = 'chats' | 'characters' | 'explore' | 'settings';
+export type NavTab = 'chats' | 'characters' | 'create' | 'settings';
 
 interface NavbarProps {
   activeTab: NavTab;
@@ -28,9 +28,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       badge: null,
     },
     {
-      id: 'explore' as NavTab,
-      label: 'Explorar',
-      icon: Sparkles,
+      id: 'create' as NavTab,
+      label: 'Crear',
+      icon: Plus,
       badge: null,
     },
     {

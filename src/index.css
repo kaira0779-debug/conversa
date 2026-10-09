@@ -21,54 +21,56 @@
     color: #EDE7F0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 15px;
-    line-height: 1.6;
-    letter-spacing: 0.01em;
+    line-height: 1.65;
+    letter-spacing: 0.005em;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* 🔥 TIPOGRAFÍA ÚNICA — Inter en toda la app */
-  h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, select {
+  /* 🔥 TIPOGRAFÍA ÚNICA — Inter en TODO, sin excepciones */
+  * {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
-  /* Solo para el splash inicial */
+  /* Elimina toda diferencia de fuente serif en la app */
   .font-serif-cinematic {
     font-family: 'Inter', -apple-system, sans-serif;
-    font-weight: 300;
-    letter-spacing: -0.02em;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
-  /* Tamaños de texto más legibles */
-  .text-xs { font-size: 13px; line-height: 1.55; }
-  .text-sm { font-size: 14.5px; line-height: 1.6; }
-  .text-base { font-size: 16px; line-height: 1.65; }
+  /* Tamaños de texto legibles */
+  .text-xs { font-size: 13px; line-height: 1.6; }
+  .text-sm { font-size: 14.5px; line-height: 1.65; }
+  .text-base { font-size: 16px; line-height: 1.7; }
   .text-lg { font-size: 18px; }
   .text-xl { font-size: 21px; }
   .text-2xl { font-size: 25px; }
+  .text-3xl { font-size: 30px; }
 
   .pt-safe { padding-top: max(env(safe-area-inset-top), 0.75rem); }
   .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
 }
 
+/* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(42, 33, 69, 0.7); border-radius: 9999px; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { scrollbar-width: none; }
 
-/* Glassmorphism */
+/* Glass */
 .glass-panel {
-  background: rgba(26, 20, 48, 0.72);
+  background: rgba(26, 20, 48, 0.75);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid rgba(107, 58, 74, 0.18);
 }
 
 .glass-card {
-  background: linear-gradient(135deg, rgba(42, 33, 69, 0.55) 0%, rgba(26, 20, 48, 0.75) 100%);
+  background: linear-gradient(135deg, rgba(42, 33, 69, 0.6) 0%, rgba(26, 20, 48, 0.8) 100%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(107, 58, 74, 0.22);
@@ -116,32 +118,56 @@
   z-index: 0;
 }
 
+/* Animaciones */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 .animate-fade-in-up { animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-fade-in { animation: fade-in 0.3s ease-out both; }
 .animate-scale-in { animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 .stagger > *:nth-child(1) { animation-delay: 0.02s; }
-.stagger > *:nth-child(2) { animation-delay: 0.04s; }
-.stagger > *:nth-child(3) { animation-delay: 0.06s; }
-.stagger > *:nth-child(4) { animation-delay: 0.08s; }
-.stagger > *:nth-child(5) { animation-delay: 0.1s; }
+.stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.stagger > *:nth-child(6) { animation-delay: 0.17s; }
 
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 🔥 CONTENIDO DEL CHAT — Tipografía unificada, sin cambios de color */
+.chat-content {
+  color: #EDE7F0;
+  font-size: 14.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.chat-content em {
+  font-style: italic;
+  color: #EDE7F0;
+  font-family: inherit;
 }

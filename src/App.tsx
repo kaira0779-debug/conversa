@@ -12,15 +12,11 @@ import { ChatListScreen } from './components/chat/ChatListScreen';
 import { ConversationScreen } from './components/chat/ConversationScreen';
 import { CharacterGridScreen } from './components/character/CharacterGridScreen';
 import { CharacterProfileScreen } from './components/character/CharacterProfileScreen';
-import { ExploreScreen } from './components/explore/ExploreScreen';
+import { CharacterCreationScreen } from './components/character/CharacterCreationScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 
 export default function App() {
-  // 🔥 Persistencia de autenticación
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return !!Storage.getAuthUser();
-  });
-
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!Storage.getAuthUser());
   const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(() => {
     const settings = Storage.getSettings();
     return !settings.pinEnabled || !Storage.getPin();
@@ -29,15 +25,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('characters');
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeProfileCharId, setActiveProfileCharId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
-  // 🔥 Estados nuevos: changelog + welcome back
   const [showChangelog, setShowChangelog] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
-  const [changelogEntries, setChangelogEntries] = useState<ReturnType<typeof getChangesSinceLastSeen>>([]);
+  const [changelogEntries, setChangelogEntries] = useState<any[]>([]);
   const [streakDays, setStreakDays] = useState(0);
   const [userName, setUserName] = useState('');
 
-  // 🔥 Al montar: actualiza streak, decide si mostrar changelog o welcome back
   useEffect(() => {
     const authUser = Storage.getAuthUser();
     if (authUser?.name) setUserName(authUser.name);
@@ -50,7 +45,6 @@ export default function App() {
         setChangelogEntries(getChangesSinceLastSeen());
         setTimeout(() => setShowChangelog(true), 600);
       } else {
-        // Solo mostrar welcome back si NO es la primera vez del día
         const lastLogin = localStorage.getItem('conversa_last_welcome_shown');
         const today = new Date().toDateString();
         if (lastLogin !== today) {
@@ -61,35 +55,14 @@ export default function App() {
     }
   }, [isAuthenticated]);
 
-  // Shareable character import
+  // Botón atrás del móvil respeta el flujo interno
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const importParam = params.get('import_char');
-      if (importParam) {
-        const decoded = JSON.parse(decodeURIComponent(importParam));
-        if (decoded && decoded.name) {
-          const existing = Storage.getCharacters().find(c => c.name === decoded.name);
-          if (existing) {
-            setActiveProfileCharId(existing.id);
-          } else {
-            const importedChar: Character = {
-              ...decoded,
-              id: `imported-${Date.now()}`,
-              createdAt: new Date().toISOString(),
-            };
-            Storage.saveCharacter(importedChar);
-            setActiveProfileCharId(importedChar.id);
-          }
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
+    const handlePop = () => {
+      if (showCreate) {
+        setShowCreate(false);
+        window.history.pushState(null, '', window.location.pathname);
+        return;
       }
-    } catch {}
-  }, []);
-
-  // 🔥 Navegación con botón atrás del móvil
-  useEffect(() => {
-    const handlePopState = () => {
       if (activeChatId) {
         setActiveChatId(null);
         window.history.pushState(null, '', window.location.pathname);
@@ -100,17 +73,13 @@ export default function App() {
         window.history.pushState(null, '', window.location.pathname);
         return;
       }
-      // En la pantalla principal, no hacemos nada (deja que el navegador maneje)
     };
-
-    // Empujamos un estado inicial para tener algo que interceptar
     if (isAuthenticated && isPinUnlocked) {
       window.history.pushState(null, '', window.location.pathname);
     }
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeChatId, activeProfileCharId, isAuthenticated, isPinUnlocked]);
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [activeChatId, activeProfileCharId, showCreate, isAuthenticated, isPinUnlocked]);
 
   const handleStartChatWithCharacter = (character: Character) => {
     const chats = Storage.getChats();
@@ -139,28 +108,35 @@ export default function App() {
     setActiveChatId(existingChat.id);
   };
 
+  const handleCharacterCreated = (char: Character) => {
+    setShowCreate(false);
+    setTimeout(() => handleStartChatWithCharacter(char), 300);
+  };
+
   const handleLogout = () => {
     Storage.saveAuthUser(null);
     setIsAuthenticated(false);
     setIsPinUnlocked(true);
     setActiveChatId(null);
     setActiveProfileCharId(null);
+    setShowCreate(false);
   };
 
-  const handleCloseChangelog = () => {
-    markChangelogAsSeen();
-    setShowChangelog(false);
-  };
-
-  if (!isAuthenticated) {
-    return <WelcomeScreen onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
+  if (!isAuthenticated) return <WelcomeScreen onAuthenticated={() => setIsAuthenticated(true)} />;
 
   const storedPin = Storage.getPin();
   if (!isPinUnlocked && storedPin) {
+    return <PinLockModal storedPin={storedPin} onSuccess={() => setIsPinUnlocked(true)} />;
+  }
+
+  if (showCreate) {
     return (
       <>
-        <PinLockModal storedPin={storedPin} onSuccess={() => setIsPinUnlocked(true)} />
+        <OfflineIndicator />
+        <CharacterCreationScreen
+          onBack={() => setShowCreate(false)}
+          onCreated={handleCharacterCreated}
+        />
       </>
     );
   }
@@ -195,10 +171,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0A1A] text-[#EDE7F0] flex flex-col justify-between selection:bg-[#E8825A]/30 selection:text-[#F5A87E]">
+    <div className="min-h-screen bg-[#0D0A1A] text-[#EDE7F0] flex flex-col justify-between">
       <OfflineIndicator />
 
-      {/* 🔥 Welcome back toast */}
       {showWelcomeBack && userName && (
         <WelcomeBackToast
           userName={userName}
@@ -220,10 +195,17 @@ export default function App() {
           <CharacterGridScreen
             onOpenCharacterProfile={(charId) => setActiveProfileCharId(charId)}
             onStartChat={handleStartChatWithCharacter}
+            onOpenCreateCharacter={() => setShowCreate(true)}
           />
         )}
 
-        {activeTab === 'explore' && <ExploreScreen />}
+        {activeTab === 'create' && (
+          <CharacterCreationScreen
+            onBack={() => setActiveTab('characters')}
+            onCreated={handleCharacterCreated}
+          />
+        )}
+
         {activeTab === 'settings' && <SettingsScreen onLogout={handleLogout} />}
       </div>
 
@@ -234,11 +216,13 @@ export default function App() {
         appVersion={APP_VERSION}
       />
 
-      {/* 🔥 Changelog modal */}
       {showChangelog && changelogEntries.length > 0 && (
         <ChangelogModal
           entries={changelogEntries}
-          onClose={handleCloseChangelog}
+          onClose={() => {
+            markChangelogAsSeen();
+            setShowChangelog(false);
+          }}
         />
       )}
     </div>

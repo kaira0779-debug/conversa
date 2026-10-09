@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Character } from '../../types';
 import { Storage } from '../../lib/storage';
-import { Search, Heart, Sparkles, Star, Plus, Layers } from 'lucide-react';
+import { Search, Heart, Star, Plus, Info, Maximize2 } from 'lucide-react';
+import { ImageViewerModal } from '../common/ImageViewerModal';
 
 type SortMode = 'recent' | 'az' | 'favorites' | 'category';
 type CategoryFilter = 'todos' | 'anime' | 'videojuegos' | 'libros' | 'fantasia';
@@ -12,38 +13,6 @@ interface CharacterGridScreenProps {
   onOpenCreateCharacter?: () => void;
 }
 
-// 🔥 Componente de avatar con fallback automático
-const CharacterAvatar: React.FC<{ character: Character; className?: string }> = ({
-  character,
-  className = '',
-}) => {
-  const [imgSrc, setImgSrc] = useState(character.avatar);
-  const [failed, setFailed] = useState(false);
-
-  const handleError = () => {
-    if (failed) return;
-    setFailed(true);
-    // Genera una URL nueva de Pollinations con el nombre del personaje
-    const seed = Math.floor(Math.random() * 999999);
-    const prompt = encodeURIComponent(
-      `${character.name}, ${character.appearance || character.occupation || 'male character'}, portrait, cinematic lighting, highly detailed`
-    );
-    setImgSrc(
-      `https://image.pollinations.ai/prompt/${prompt}?width=768&height=1024&model=flux&seed=${seed}&nologo=true`
-    );
-  };
-
-  return (
-    <img
-      src={imgSrc}
-      alt={character.name}
-      loading="lazy"
-      onError={handleError}
-      className={className}
-    />
-  );
-};
-
 export const CharacterGridScreen: React.FC<CharacterGridScreenProps> = ({
   onOpenCharacterProfile,
   onStartChat,
@@ -53,7 +22,7 @@ export const CharacterGridScreen: React.FC<CharacterGridScreenProps> = ({
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [category, setCategory] = useState<CategoryFilter>('todos');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [longPressChar, setLongPressChar] = useState<Character | null>(null);
+  const [viewingImage, setViewingImage] = useState<{ src: string; alt: string } | null>(null);
   const [, forceRefresh] = useState(0);
 
   const allCharacters = Storage.getCharacters();
@@ -99,15 +68,16 @@ export const CharacterGridScreen: React.FC<CharacterGridScreenProps> = ({
     <div className="relative min-h-screen bg-[#0D0A1A] pb-24 text-[#EDE7F0] overflow-hidden">
       <div className="ambient-glow-top" />
 
+      {/* Header */}
       <header className="sticky top-0 z-30 glass-panel border-b border-[#2A2145]/40">
         <div className="max-w-md mx-auto px-4 pt-safe pb-3">
           <div className="flex items-center justify-between mb-3 pt-3">
             <div className="animate-fade-in-up">
-              <h1 className="text-2xl leading-none font-bold tracking-wide text-[#EDE7F0]">
+              <h1 className="text-2xl leading-none font-bold tracking-wide">
                 Conversa <span className="text-[#E8825A]">✦</span>
               </h1>
               <p className="text-[11px] text-[#F5A87E]/70 mt-1 tracking-wider uppercase">
-                {filtered.length} {filtered.length === 1 ? 'personaje' : 'personajes'}
+                {filtered.length} personajes
               </p>
             </div>
             <div className="flex items-center gap-1.5 animate-fade-in-up">
@@ -163,144 +133,133 @@ export const CharacterGridScreen: React.FC<CharacterGridScreenProps> = ({
         </div>
       </header>
 
+      {/* Grid 2 COLUMNAS */}
       <main className="max-w-md mx-auto px-4 py-4 relative z-10">
         {filtered.length === 0 ? (
           <div className="text-center py-20 animate-fade-in">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-3xl bg-[#1A1430] border border-[#2A2145] flex items-center justify-center text-[#F5A87E]/40">
-              <Sparkles className="w-7 h-7" />
-            </div>
-            <p className="text-base font-semibold text-[#EDE7F0]">
-              {search ? 'Sin coincidencias' : 'Sin personajes aquí aún'}
-            </p>
-            <p className="text-sm text-[#EDE7F0]/50 mt-1 max-w-xs mx-auto">
-              {search ? 'Prueba con otro nombre o cambia el filtro.' : 'Crea uno nuevo o explora el catálogo.'}
-            </p>
+            <p className="text-base font-semibold">Sin personajes</p>
+            <p className="text-sm text-[#EDE7F0]/50 mt-1">Crea uno con el botón +</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3 stagger">
+          <div className="grid grid-cols-2 gap-3.5 stagger">
             {filtered.map((char, idx) => (
               <button
                 key={char.id}
-                onClick={() => onOpenCharacterProfile(char.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setLongPressChar(char);
-                }}
-                className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform animate-fade-in-up"
-                style={{ animationDelay: `${Math.min(idx * 0.015, 0.3)}s` }}
+                onClick={() => onStartChat(char)}
+                className="flex flex-col active:scale-[0.97] transition-transform animate-fade-in-up text-left"
+                style={{ animationDelay: `${Math.min(idx * 0.02, 0.3)}s` }}
               >
-                <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#1A1430] border border-[#2A2145]/80 active:border-[#E8825A] transition-all shadow-cinematic">
-                  {/* 🔥 Avatar con fallback automático */}
-                  <CharacterAvatar
-                    character={char}
+                {/* Card container */}
+                <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden bg-[#1A1430] border border-[#2A2145]/80 active:border-[#E8825A] transition-all shadow-cinematic group">
+                  <img
+                    src={char.avatar}
+                    alt={char.name}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+                        `${char.name}, ${char.appearance || 'character'}, cinematic portrait, high quality`
+                      )}?width=1024&height=1536&model=flux&seed=${Math.floor(Math.random() * 999999)}&nologo=true`;
+                    }}
                   />
 
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#0D0A1A]/70 via-[#0D0A1A]/20 to-transparent pointer-events-none" />
+                  {/* Gradient overlay inferior */}
+                  <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#0D0A1A] via-[#0D0A1A]/60 to-transparent pointer-events-none" />
 
+                  {/* Info inferior sobre la imagen */}
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <p className="text-base font-bold text-[#EDE7F0] truncate leading-tight drop-shadow-lg">
+                      {char.name}
+                    </p>
+                    {char.occupation && (
+                      <p className="text-[11px] text-[#F5A87E] truncate mt-0.5 font-medium drop-shadow">
+                        {char.occupation}
+                      </p>
+                    )}
+                    {char.personalityTags && char.personalityTags.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 overflow-hidden">
+                        {char.personalityTags.slice(0, 2).map((tag, i) => (
+                          <span
+                            key={i}
+                            className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#0D0A1A]/80 backdrop-blur-sm border border-[#6B3A4A]/50 text-[#F5A87E] whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botones superiores flotantes */}
+                  <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+                    <button
+                      onClick={(e) => toggleFavorite(char, e)}
+                      className="p-1.5 rounded-full bg-[#0D0A1A]/80 backdrop-blur-md active:scale-90 transition"
+                    >
+                      <Star
+                        className={`w-3.5 h-3.5 ${
+                          char.isFavorite ? 'fill-[#E8825A] text-[#E8825A]' : 'text-[#EDE7F0]/70'
+                        }`}
+                      />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingImage({ src: char.avatar, alt: char.name });
+                      }}
+                      className="p-1.5 rounded-full bg-[#0D0A1A]/80 backdrop-blur-md active:scale-90 transition"
+                      title="Ver imagen completa"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5 text-[#EDE7F0]/70" />
+                    </button>
+                  </div>
+
+                  {/* Botón perfil esquina inferior derecha */}
                   <button
-                    onClick={(e) => toggleFavorite(char, e)}
-                    className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-[#0D0A1A]/80 backdrop-blur-md active:scale-90 transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCharacterProfile(char.id);
+                    }}
+                    className="absolute bottom-2 right-2 p-1.5 rounded-full bg-[#0D0A1A]/80 backdrop-blur-md active:scale-90 transition"
+                    title="Ver perfil"
                   >
-                    <Star
-                      className={`w-3 h-3 ${
-                        char.isFavorite ? 'fill-[#E8825A] text-[#E8825A]' : 'text-[#EDE7F0]/70'
-                      }`}
-                    />
+                    <Info className="w-3.5 h-3.5 text-[#F5A87E]" />
                   </button>
 
-                  {char.category && (
-                    <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[#0D0A1A]/80 backdrop-blur-md text-[8px] uppercase tracking-wider text-[#F5A87E] font-bold border border-[#6B3A4A]/40">
-                      {char.category === 'videojuegos'
-                        ? 'GAME'
-                        : char.category === 'anime'
-                        ? 'ANIME'
-                        : char.category === 'libros'
-                        ? 'LIBRO'
-                        : 'FANT'}
+                  {/* Villain badge */}
+                  {char.isVillain && (
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-rose-950/90 backdrop-blur-sm text-[9px] font-bold text-rose-300 border border-rose-800/60">
+                      VILLANO
                     </span>
                   )}
-
-                  {char.isVillain && (
-                    <span className="absolute bottom-1.5 left-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#0D0A1A]/70" />
-                  )}
                 </div>
-
-                <span className="text-[12px] font-medium text-[#EDE7F0] truncate w-full text-center leading-tight">
-                  {char.name}
-                </span>
-                {char.occupation && (
-                  <span className="text-[10px] text-[#F5A87E]/60 truncate w-full text-center -mt-1">
-                    {char.occupation.split(' ').slice(0, 2).join(' ')}
-                  </span>
-                )}
               </button>
             ))}
 
+            {/* Crear personaje */}
             {onOpenCreateCharacter && (
               <button
                 onClick={onOpenCreateCharacter}
-                className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform animate-fade-in-up"
+                className="flex flex-col active:scale-[0.97] transition-transform animate-fade-in-up"
               >
-                <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-[#1A1430]/60 to-[#0D0A1A]/60 border-2 border-dashed border-[#3D2E4A]/60 flex items-center justify-center text-[#F5A87E]/40">
-                  <Plus className="w-7 h-7" />
+                <div className="w-full aspect-[3/4] rounded-2xl bg-gradient-to-br from-[#1A1430]/60 to-[#0D0A1A]/60 border-2 border-dashed border-[#3D2E4A]/60 flex flex-col items-center justify-center text-[#F5A87E]/60 gap-2">
+                  <Plus className="w-8 h-8" />
+                  <span className="text-xs font-medium">Crear personaje</span>
                 </div>
-                <span className="text-[11px] text-[#F5A87E]/50 text-center">Crear</span>
               </button>
             )}
           </div>
         )}
       </main>
 
-      {longPressChar && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center p-4 animate-fade-in"
-          onClick={() => setLongPressChar(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-3xl glass-card p-4 animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 pb-3 border-b border-[#2A2145]/60 mb-3">
-              <CharacterAvatar
-                character={longPressChar}
-                className="w-14 h-14 rounded-full object-cover border-2 border-[#3D2E4A]/70"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-base truncate text-[#EDE7F0]">{longPressChar.name}</p>
-                <p className="text-xs text-[#F5A87E]/70 truncate">{longPressChar.occupation}</p>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <button
-                onClick={() => {
-                  onStartChat(longPressChar);
-                  setLongPressChar(null);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-[#E8825A] text-[#0D0A1A] font-bold text-sm glow-coral active:scale-[0.98] transition"
-              >
-                <span>Iniciar conversación</span>
-                <Sparkles className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => {
-                  onOpenCharacterProfile(longPressChar.id);
-                  setLongPressChar(null);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-[#2A2145]/50 text-sm text-[#EDE7F0]"
-              >
-                <span>Ver perfil completo</span>
-                <Layers className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setLongPressChar(null)}
-                className="w-full p-2.5 rounded-xl text-sm text-[#EDE7F0]/50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Image viewer */}
+      {viewingImage && (
+        <ImageViewerModal
+          src={viewingImage.src}
+          alt={viewingImage.alt}
+          onClose={() => setViewingImage(null)}
+        />
       )}
     </div>
   );
