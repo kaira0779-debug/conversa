@@ -1,31 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { Storage } from './lib/storage';
 import { Character, ChatSession } from './types';
+import { shouldShowChangelog, markChangelogAsSeen, getChangesSinceLastSeen, APP_VERSION } from './lib/version';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
 import { PinLockModal } from './components/auth/PinLockModal';
+import { ChangelogModal } from './components/layout/ChangelogModal';
+import { WelcomeBackToast } from './components/layout/WelcomeBackToast';
 import { Navbar, NavTab } from './components/layout/Navbar';
 import { OfflineIndicator } from './components/layout/OfflineIndicator';
 import { ChatListScreen } from './components/chat/ChatListScreen';
 import { ConversationScreen } from './components/chat/ConversationScreen';
-import { CharacterListScreen } from './components/character/CharacterListScreen';
+import { CharacterGridScreen } from './components/character/CharacterGridScreen';
 import { CharacterProfileScreen } from './components/character/CharacterProfileScreen';
 import { ExploreScreen } from './components/explore/ExploreScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
 
 export default function App() {
+  // 🔥 Persistencia de autenticación
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return !!Storage.getAuthUser();
   });
+
   const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(() => {
     const settings = Storage.getSettings();
     return !settings.pinEnabled || !Storage.getPin();
   });
 
-  const [activeTab, setActiveTab] = useState<NavTab>('chats');
+  const [activeTab, setActiveTab] = useState<NavTab>('characters');
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeProfileCharId, setActiveProfileCharId] = useState<string | null>(null);
 
-  // Check URL query params for shareable character import (?import_char=...)
+  // 🔥 Estados nuevos: changelog + welcome back
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false);
+  const [changelogEntries, setChangelogEntries] = useState<ReturnType<typeof getChangesSinceLastSeen>>([]);
+  const [streakDays, setStreakDays] = useState(0);
+  const [userName, setUserName] = useState('');
+
+  // 🔥 Al montar: actualiza streak, decide si mostrar changelog o welcome back
+  useEffect(() => {
+    const authUser = Storage.getAuthUser();
+    if (authUser?.name) setUserName(authUser.name);
+
+    const newStreak = Storage.updateStreak();
+    setStreakDays(newStreak);
+
+    if (isAuthenticated && authUser) {
+      if (shouldShowChangelog()) {
+        setChangelogEntries(getChangesSinceLastSeen());
+        setTimeout(() => setShowChangelog(true), 600);
+      } else {
+        // Solo mostrar welcome back si NO es la primera vez del día
+        const lastLogin = localStorage.getItem('conversa_last_welcome_shown');
+        const today = new Date().toDateString();
+        if (lastLogin !== today) {
+          localStorage.setItem('conversa_last_welcome_shown', today);
+          setTimeout(() => setShowWelcomeBack(true), 400);
+        }
+      }
+    }
+  }, [isAuthenticated]);
+
+  // Shareable character import
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -33,7 +69,6 @@ export default function App() {
       if (importParam) {
         const decoded = JSON.parse(decodeURIComponent(importParam));
         if (decoded && decoded.name) {
-          // If already exists, just open it, otherwise import
           const existing = Storage.getCharacters().find(c => c.name === decoded.name);
           if (existing) {
             setActiveProfileCharId(existing.id);
@@ -46,16 +81,37 @@ export default function App() {
             Storage.saveCharacter(importedChar);
             setActiveProfileCharId(importedChar.id);
           }
-          // Clean URL
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
-    } catch (e) {
-      console.warn('Could not parse shared character URL:', e);
-    }
+    } catch {}
   }, []);
 
-  // Handle starting a new conversation with a specific character
+  // 🔥 Navegación con botón atrás del móvil
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activeChatId) {
+        setActiveChatId(null);
+        window.history.pushState(null, '', window.location.pathname);
+        return;
+      }
+      if (activeProfileCharId) {
+        setActiveProfileCharId(null);
+        window.history.pushState(null, '', window.location.pathname);
+        return;
+      }
+      // En la pantalla principal, no hacemos nada (deja que el navegador maneje)
+    };
+
+    // Empujamos un estado inicial para tener algo que interceptar
+    if (isAuthenticated && isPinUnlocked) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeChatId, activeProfileCharId, isAuthenticated, isPinUnlocked]);
+
   const handleStartChatWithCharacter = (character: Character) => {
     const chats = Storage.getChats();
     let existingChat = chats.find(c => c.characterId === character.id);
@@ -71,6 +127,9 @@ export default function App() {
         explicitLevel: character.explicitLevel || 'sugerente',
         wallpaperTheme: 'midnight',
         semanticMemories: [],
+        memoryCards: [],
+        bondScore: 0,
+        bondLevel: 'Desconocidos',
       };
       Storage.saveChat(newChat);
       existingChat = newChat;
@@ -88,23 +147,24 @@ export default function App() {
     setActiveProfileCharId(null);
   };
 
-  // Screen 1: Welcome / Login
+  const handleCloseChangelog = () => {
+    markChangelogAsSeen();
+    setShowChangelog(false);
+  };
+
   if (!isAuthenticated) {
     return <WelcomeScreen onAuthenticated={() => setIsAuthenticated(true)} />;
   }
 
-  // PIN lock layer if enabled and not unlocked this session
   const storedPin = Storage.getPin();
   if (!isPinUnlocked && storedPin) {
     return (
-      <PinLockModal
-        storedPin={storedPin}
-        onSuccess={() => setIsPinUnlocked(true)}
-      />
+      <>
+        <PinLockModal storedPin={storedPin} onSuccess={() => setIsPinUnlocked(true)} />
+      </>
     );
   }
 
-  // Active full-screen conversation view
   if (activeChatId) {
     return (
       <>
@@ -121,7 +181,6 @@ export default function App() {
     );
   }
 
-  // Active character profile view
   if (activeProfileCharId) {
     return (
       <>
@@ -135,12 +194,19 @@ export default function App() {
     );
   }
 
-  // Main App with Bottom Navigation
   return (
     <div className="min-h-screen bg-[#0D0A1A] text-[#EDE7F0] flex flex-col justify-between selection:bg-[#E8825A]/30 selection:text-[#F5A87E]">
       <OfflineIndicator />
 
-      {/* Tab Screen Content */}
+      {/* 🔥 Welcome back toast */}
+      {showWelcomeBack && userName && (
+        <WelcomeBackToast
+          userName={userName}
+          streak={streakDays}
+          onDismiss={() => setShowWelcomeBack(false)}
+        />
+      )}
+
       <div className="flex-1">
         {activeTab === 'chats' && (
           <ChatListScreen
@@ -151,23 +217,30 @@ export default function App() {
         )}
 
         {activeTab === 'characters' && (
-          <CharacterListScreen
+          <CharacterGridScreen
             onOpenCharacterProfile={(charId) => setActiveProfileCharId(charId)}
             onStartChat={handleStartChatWithCharacter}
           />
         )}
 
         {activeTab === 'explore' && <ExploreScreen />}
-
         {activeTab === 'settings' && <SettingsScreen onLogout={handleLogout} />}
       </div>
 
-      {/* Bottom Nav */}
       <Navbar
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         unreadCount={0}
+        appVersion={APP_VERSION}
       />
+
+      {/* 🔥 Changelog modal */}
+      {showChangelog && changelogEntries.length > 0 && (
+        <ChangelogModal
+          entries={changelogEntries}
+          onClose={handleCloseChangelog}
+        />
+      )}
     </div>
   );
 }

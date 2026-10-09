@@ -353,9 +353,10 @@ export async function generateFantasyCharacter(
     if (res.ok) {
       const data = await res.json();
       if (data.character && data.character.name && data.character.avatar) {
+        // Aseguramos que siempre sea masculino (regla del catálogo)
         data.character.gender = 'masculino';
-        if (!data.character.pronouns || data.character.pronouns.toLowerCase().includes('ella')) {
-          data.character.pronouns = 'Él / Compañero de Ficción';
+        if (!data.character.pronouns) {
+          data.character.pronouns = 'Él';
         }
         return data.character as Character;
       }
